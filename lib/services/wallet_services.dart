@@ -29,7 +29,7 @@ class WalletService {
         icons: ["https://your-app-url.com/icon.png"],
       ),
     );
-      setupNewWallet();
+      // setupNewWallet();
   }
 
   /// Creates a new main wallet and a backup HushWallet
@@ -152,6 +152,5 @@ class WalletService {
     await setupNewWallet();
     print("A new backup HushWallet has been created.");
   }
-
 
 }
