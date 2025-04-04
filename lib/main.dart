@@ -18,8 +18,6 @@ class MyApp extends StatelessWidget {
       title: 'Crypt',
       theme: ThemeData.dark(),
       home: LoginScreen(),
-<<<<<<< HEAD
-=======
     );
   }
 }
@@ -413,7 +411,6 @@ class _WalletScreenState extends State<WalletScreen> {
         SizedBox(height: 8),
         Text(label, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
       ],
->>>>>>> 551287cb44f3ad05c0f916198e617fbaca58b423
     );
   }
 }
