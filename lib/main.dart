@@ -30,8 +30,6 @@ class CryptoWalletApp extends StatelessWidget {
   }
 }
 
-
-
 // -------------------- LOGIN SCREEN --------------------
 class LoginScreen extends StatelessWidget {
   final WalletService walletService = WalletService();
@@ -306,11 +304,26 @@ class _WalletScreenState extends State<WalletScreen> {
   String balance = 'Fetching...';
   String? walletAddress;
   List<Map<String, String>> assets = [];
+  bool isLoading = true;
+  bool hasWallet = false;
 
   @override
   void initState() {
     super.initState();
-    _loadWalletData();
+    _checkWallet();
+  }
+
+  Future<void> _checkWallet() async {
+    setState(() => isLoading = true);
+    String? privateKey = await widget.walletService.loadPrivateKey();
+    setState(() {
+      hasWallet = privateKey != null;
+      isLoading = false;
+    });
+    
+    if (hasWallet) {
+      _loadWalletData();
+    }
   }
 
   Future<void> _loadWalletData() async {
@@ -341,6 +354,30 @@ class _WalletScreenState extends State<WalletScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (isLoading) {
+      return Scaffold(
+        backgroundColor: Colors.black,
+        appBar: AppBar(
+          title: Text('Wallet', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+          backgroundColor: Colors.black,
+          elevation: 0,
+        ),
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+    
+    if (!hasWallet) {
+      return CreateWalletScreen(
+        walletService: widget.walletService,
+        onWalletCreated: () {
+          setState(() {
+            hasWallet = true;
+          });
+          _loadWalletData();
+        },
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
@@ -368,11 +405,33 @@ class _WalletScreenState extends State<WalletScreen> {
                 ],
               ),
             ),
+            SizedBox(height: 10),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.grey[900],
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.account_balance_wallet, color: Colors.grey),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      '${walletAddress ?? "No wallet address"}',
+                      style: TextStyle(fontSize: 12),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
             SizedBox(height: 20),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _walletActionButton(Icons.download, 'Buy'),
+                _walletActionButton(Icons.download, 'Receive'),
                 _walletActionButton(Icons.arrow_upward, 'Send'),
                 _walletActionButton(Icons.swap_horiz, 'Swap'),
               ],
@@ -423,12 +482,252 @@ class _WalletScreenState extends State<WalletScreen> {
     );
   }
 }
-<<<<<<< HEAD
-=======
+
+// -------------------- CREATE WALLET SCREEN --------------------
+class CreateWalletScreen extends StatefulWidget {
+  final WalletService walletService;
+  final VoidCallback onWalletCreated;
+  
+  CreateWalletScreen({required this.walletService, required this.onWalletCreated});
+  
+  @override
+  _CreateWalletScreenState createState() => _CreateWalletScreenState();
+}
+
+class _CreateWalletScreenState extends State<CreateWalletScreen> {
+  bool isCreating = false;
+  bool showingSeedPhrase = false;
+  String? mnemonic;
+  String? privateKey;
+  String? walletAddress;
+  List<String> mnemonicWords = [];
+  
+  void _startWalletCreation() async {
+    setState(() {
+      isCreating = true;
+    });
+    
+    // Generate the seed phrase
+    final newMnemonic = widget.walletService.generateMnemonic();
+    final newPrivateKey = widget.walletService.derivePrivateKey(newMnemonic);
+    final newAddress = widget.walletService.getEthereumAddress(newPrivateKey);
+    
+    setState(() {
+      mnemonic = newMnemonic;
+      privateKey = newPrivateKey;
+      walletAddress = newAddress;
+      mnemonicWords = newMnemonic.split(' ');
+      showingSeedPhrase = true;
+      isCreating = false;
+    });
+  }
+  
+  void _finishWalletCreation() async {
+    setState(() {
+      isCreating = true;
+    });
+    
+    try {
+      // First save the seed phrase and private key for the main wallet
+      await widget.walletService.saveSeedPhrase(mnemonic!);
+      await widget.walletService.savePrivateKey(privateKey!);
+      
+      // Now creating the backup HushWallet
+      await widget.walletService.hushWalletService.createWallet(isBackup: true);
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Wallet created successfully!'))
+      );
+      
+      widget.onWalletCreated();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error creating wallet: $e'))
+      );
+    }
+    
+    setState(() {
+      isCreating = false;
+    });
+  }
+  
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        title: Text('Create Wallet', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.black,
+        elevation: 0,
+      ),
+      body: isCreating 
+        ? Center(child: CircularProgressIndicator())
+        : showingSeedPhrase
+          ? _buildSeedPhraseScreen()
+          : _buildWelcomeScreen(),
+    );
+  }
+  
+  Widget _buildWelcomeScreen() {
+    return Padding(
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.account_balance_wallet,
+            size: 100,
+            color: Colors.deepPurple[400],
+          ),
+          SizedBox(height: 30),
+          Text(
+            'Welcome to Crypt',
+            style: TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          SizedBox(height: 20),
+          Text(
+            'It looks like you don\'t have a wallet yet. Create one to get started with cryptocurrencies!',
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.grey[400],
+            ),
+            textAlign: TextAlign.center,
+          ),
+          SizedBox(height: 40),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.deepPurple[500],
+                padding: EdgeInsets.symmetric(vertical: 15),
+              ),
+              onPressed: _startWalletCreation,
+              child: Text(
+                'Create Wallet',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildSeedPhraseScreen() {
+    return Padding(
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Your Recovery Phrase',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          SizedBox(height: 10),
+          Container(
+            padding: EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.red[900]?.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.red[900]!, width: 1),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, color: Colors.red[300]),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Write these words down in the correct order and keep them safe. You will NEVER see them again. Anyone with these words can access your wallet.',
+                    style: TextStyle(fontSize: 12, color: Colors.red[100]),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(height: 24),
+          Expanded(
+            child: Container(
+              padding: EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey[900],
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: GridView.builder(
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  childAspectRatio: 2.5,
+                  crossAxisSpacing: 10,
+                  mainAxisSpacing: 10,
+                ),
+                itemCount: mnemonicWords.length,
+                itemBuilder: (context, index) {
+                  return Container(
+                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[800],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Text(
+                          '${index + 1}.',
+                          style: TextStyle(
+                            color: Colors.grey[500],
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            mnemonicWords[index],
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+          SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.deepPurple[500],
+                padding: EdgeInsets.symmetric(vertical: 15),
+              ),
+              onPressed: _finishWalletCreation,
+              child: Text(
+                'I\'ve Saved My Recovery Phrase',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 //------------------------ HushWallet Screen ------------------------
 class HushWalletScreen extends StatefulWidget {
   final HushWalletService hushWalletService;
-  
   HushWalletScreen({required this.hushWalletService});
   
   @override
@@ -585,4 +884,3 @@ class _HushWalletScreenState extends State<HushWalletScreen> {
     );
   }
 }
->>>>>>> bd3e64b44f6c74a2ebf55b1bd04284b311715940
