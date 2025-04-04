@@ -152,8 +152,6 @@ class WalletService {
     await setupNewWallet();
     print("A new backup HushWallet has been created.");
   }
-
-    //hnn created: extra function
   /// Fetches the ETH to USD conversion ratewith this coingecko API
   Future<double> getEthToUsdRate() async {
     final url = Uri.parse('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd');
