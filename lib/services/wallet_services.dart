@@ -15,4 +15,20 @@ class WalletService {
   late Web3Client ethClient; // lets us send transaction,get balance, interact with smart contracts
   late WalletConnect connector; //connects the metamask wallet to our app
   SessionStatus? session; //keep tracks of metamask wallet connection
+
+    WalletService() {
+    ethClient = Web3Client(rpcUrl, http.Client()); //creating a connection w the ethereum , allows us to send transactions, check balances, interact with smart contracts
+
+    // Initialize WalletConnect so we can later use it to connect with meta mask
+    connector = WalletConnect(
+      bridge: 'https://bridge.walletconnect.org',
+      clientMeta: PeerMeta(
+        name: "Crypto Wallet",
+        description: "A secure crypto wallet",
+        url: "https://example.com",
+        icons: ["https://your-app-url.com/icon.png"],
+      ),
+    );
+      // setupNewWallet();
+  }
 }
