@@ -118,7 +118,7 @@ class LoginScreen extends StatelessWidget {
 }
 
 
-//---------------------MainScreen to handle navigation -----------------------------
+//--------------------- MainScreen to handle navigation -----------------------------
 class MainScreen extends StatefulWidget {
   final WalletService walletService;
   MainScreen({required this.walletService});
