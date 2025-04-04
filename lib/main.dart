@@ -1,16 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:crypto_wallet/utils/encryption_helper.dart';
 
 // ignore_for_file: unused_local_variable
-import 'package:flutter/material.dart';
 import 'services/wallet_services.dart';
-import 'services/hush_wallet_service.dart';
+import 'services/hush_wallet_services.dart';
 import 'package:web3dart/web3dart.dart';
 
-void main() {
-  runApp(MyApp());
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Load encryption key when the app starts
+  await EncryptionHelper.loadKey();
+
+  runApp(CryptoWalletApp());
 }
 
-class MyApp extends StatelessWidget {
+class CryptoWalletApp extends StatelessWidget {
+  const CryptoWalletApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -21,6 +29,7 @@ class MyApp extends StatelessWidget {
     );
   }
 }
+
 
 
 // -------------------- LOGIN SCREEN --------------------

@@ -1,4 +1,5 @@
-import 'hush_wallet_service.dart';
+import 'dart:convert';
+import 'hush_wallet_services.dart';
 import 'package:bip39/bip39.dart' as bip39;
 import 'package:bip32/bip32.dart' as bip32;
 import 'package:hex/hex.dart';
@@ -7,16 +8,18 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:walletconnect_dart/walletconnect_dart.dart';
 
+
 //setting up dependencies/tools we will use throughout the service!!!
+
 class WalletService {
   final storage = FlutterSecureStorage(); //saves private key on the devices
-  final String rpcUrl = "https://sepolia.infura.io/v3/235b57e865d249359ec1aebd2c620c39"; // Infura API
-  // final HushWalletService hushWalletService = HushWalletService(); 
+  final String rpcUrl = "https://sepolia.infura.io/v3/235b57e865d249359ec1aebd2c620c39"; // Infura API- intracting w blockchain using etherum node url which in this case is infura, an ethereum provider and i fucking forgot mine so i have to ask bhaiya
+  final HushWalletService hushWalletService = HushWalletService();
   late Web3Client ethClient; // lets us send transaction,get balance, interact with smart contracts
   late WalletConnect connector; //connects the metamask wallet to our app
   SessionStatus? session; //keep tracks of metamask wallet connection
 
-    WalletService() {
+  WalletService() {
     ethClient = Web3Client(rpcUrl, http.Client()); //creating a connection w the ethereum , allows us to send transactions, check balances, interact with smart contracts
 
     // Initialize WalletConnect so we can later use it to connect with meta mask
@@ -32,17 +35,19 @@ class WalletService {
       setupNewWallet();
   }
 
-  /// Creates a new main wallet and a backup HushWallet
+/// Creates a new main wallet and a backup HushWallet
   Future<void> setupNewWallet() async {
     print("Setting up a new wallet and backup HushWallet...");
     await hushWalletService.createWallet(isBackup: false);
     await hushWalletService.createWallet(isBackup: true);
   }
 
+
+
   /// Generates a 12-word mnemonic (seed phrase)
   String generateMnemonic() {
     return bip39.generateMnemonic();
-  } //generating 12 seed phrases, using the big39 package we included on the top of the code 
+  } //generating 12 seed phrases, here we are using the big39 package we included on the top of the code 
 
   /// Converts seed phrases to private key 
   String derivePrivateKey(String mnemonic) {
@@ -100,7 +105,7 @@ class WalletService {
     }
   }
 
-    /// Disconnects MetaMask
+  /// Disconnects MetaMask
   Future<void> disconnectMetaMask() async {
     if (connector.connected) {
       await connector.killSession();
@@ -152,6 +157,8 @@ class WalletService {
     await setupNewWallet();
     print("A new backup HushWallet has been created.");
   }
+
+  //hnn created: extra function
   /// Fetches the ETH to USD conversion ratewith this coingecko API
   Future<double> getEthToUsdRate() async {
     final url = Uri.parse('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd');
