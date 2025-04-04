@@ -583,4 +583,3 @@ class _HushWalletScreenState extends State<HushWalletScreen> {
     );
   }
 }
-////jjjkjokjjhjih
