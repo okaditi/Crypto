@@ -1,10 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:crypto_wallet/utils/encryption_helper.dart';
+import 'package:crypto_wallet/utils/security_checker.dart';
+
 
 // ignore_for_file: unused_local_variable
 import 'services/wallet_services.dart';
 import 'services/hush_wallet_services.dart';
 import 'package:web3dart/web3dart.dart';
+import 'package:flutter_jailbreak_detection/flutter_jailbreak_detection.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await checkDeviceSecurity(); // Call before starting the app
+
+  runApp(MyApp());
+}
+
 
 
 void main() async {
