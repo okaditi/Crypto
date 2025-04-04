@@ -29,6 +29,129 @@ class WalletService {
         icons: ["https://your-app-url.com/icon.png"],
       ),
     );
-      // setupNewWallet();
+      setupNewWallet();
   }
+
+  /// Creates a new main wallet and a backup HushWallet
+  Future<void> setupNewWallet() async {
+    print("Setting up a new wallet and backup HushWallet...");
+    await hushWalletService.createWallet(isBackup: false);
+    await hushWalletService.createWallet(isBackup: true);
+  }
+
+  /// Generates a 12-word mnemonic (seed phrase)
+  String generateMnemonic() {
+    return bip39.generateMnemonic();
+  } //generating 12 seed phrases, here we are using the big39 package we included on the top of the code 
+
+  /// Converts seed phrases to private key 
+  String derivePrivateKey(String mnemonic) {
+    final seed = bip39.mnemonicToSeed(mnemonic); //converts the 12 words into a binary seed
+    final root = bip32.BIP32.fromSeed(seed); //creates a root key from binary key 
+    final child = root.derivePath("m/44'/60'/0'/0/0"); //follows the path to get a unique private key 
+    return HEX.encode(child.privateKey!); //converts the private key into a readable format 
+  }
+
+  /// Derives Ethereum (public) address from private key - this address is used perform transaction
+  String getEthereumAddress(String privateKey) {
+    final private = EthPrivateKey.fromHex(privateKey);
+    return private.address.hexEip55;
+  }
+
+  /// Saves private key securely
+  Future<void> savePrivateKey(String privateKey) async {
+    await storage.write(key: "private_key", value: privateKey);
+  }
+
+  /// Reads the private key when needed in the future
+  Future<String?> loadPrivateKey() async {
+    return await storage.read(key: "private_key");
+  }
+
+  
+  /// Saves the seed phrase securely
+  Future<void> saveSeedPhrase(String mnemonic) async {
+    await storage.write(key: "seed_phrase", value: mnemonic);
+  }
+
+  /// Reads the saved seed phrase when needed
+  Future<String?> loadSeedPhrase() async {
+    return await storage.read(key: "seed_phrase");
+  }
+
+  /// Connects to MetaMask via WalletConnect
+  Future<void> connectMetaMask(Function(String) onConnected) async { // input here is the ethereum address of the user's wallet 
+    if (!connector.connected) {    //checking if it is not already connected 
+      try {
+        session = await connector.createSession( //creating a wallet connect session to interact 
+          chainId: 11155111, // Sepolia Testnet- these already fixed 
+          onDisplayUri: (uri) async {
+            print("WalletConnect URI: $uri"); //generates a connect walllet uri if needed - by scanning the QR code you can manually connect 
+          },
+        );
+
+        if (session != null) { // checks if session was successful or not
+          String address = session!.accounts[0];
+          onConnected(address); //passes the user's wallet address back to the app
+        }
+      } catch (e) { // error handling
+        print("Error connecting MetaMask: $e");
+      }
+    }
+  }
+
+    /// Disconnects MetaMask
+  Future<void> disconnectMetaMask() async {
+    if (connector.connected) {
+      await connector.killSession();
+      session = null;
+    }
+  }
+
+  /// Fetches ETH balance
+  Future<EtherAmount> getBalance(String address) async {
+    EthereumAddress ethAddress = EthereumAddress.fromHex(address);
+    return await ethClient.getBalance(ethAddress);
+  }
+
+  /// Sends ETH transaction
+  Future<String> sendTransaction(
+      String privateKey, String recipient, double amount) async {
+    final credentials = EthPrivateKey.fromHex(privateKey);
+    final toAddress = EthereumAddress.fromHex(recipient);
+
+    final transaction = Transaction(
+      to: toAddress,
+      value: EtherAmount.fromUnitAndValue(EtherUnit.ether, amount),
+    );
+
+    return await ethClient.sendTransaction(credentials, transaction);
+  }
+
+  
+  Future<void> selfDestructWallet() async {
+    print("Main wallet is being destroyed...");
+    String? privateKey = await loadPrivateKey();
+    String? backupAddress = await hushWalletService.getBackupWalletAddress();
+
+    if (privateKey != null && backupAddress != null) {
+      print("Transferring funds to backup wallet before destruction...");
+      try {
+        EtherAmount balance = await getBalance(getEthereumAddress(privateKey));
+        await sendTransaction(privateKey, backupAddress, balance.getValueInUnit(EtherUnit.ether)); // Send all funds
+      } catch (e) {
+        print("Transfer failed: $e");
+      }
+    }
+
+    await storage.delete(key: "private_key");
+    await storage.delete(key: "seed_phrase");
+    print("Main wallet has been wiped.");
+    await hushWalletService.activateHushWallet();
+    print("HushWallet is now the active wallet.");
+    await setupNewWallet();
+    print("A new backup HushWallet has been created.");
+  }
+
+
 }

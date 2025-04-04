@@ -17,7 +17,7 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Crypt',
       theme: ThemeData.dark(),
-      // home: LoginScreen(),
+      home: LoginScreen(),
     );
   }
 }
