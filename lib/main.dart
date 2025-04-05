@@ -31,7 +31,7 @@ void main() async {
 
 
 class CryptoWalletApp extends StatelessWidget {
-  const CryptoWalletApp({super.key});
+  CryptoWalletApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -352,6 +352,7 @@ class _WalletScreenState extends State<WalletScreen> {
         EtherAmount ethBalance = await widget.walletService.getBalance(address);
         double ethValue = ethBalance.getValueInUnit(EtherUnit.ether);
         double ethToUsd = await widget.walletService.getEthToUsdRate();
+        // ignore: unused_local_variable
         double ethUsdValue = ethValue * ethToUsd;
 
         List<Map<String, String>> fetchedAssets = await widget.walletService.getAllAssets(address);
