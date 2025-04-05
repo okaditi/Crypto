@@ -32,7 +32,8 @@ class WalletService {
         icons: ["https://your-app-url.com/icon.png"],
       ),
     );
-      setupNewWallet();
+    // We're no longer automatically creating a wallet on initialization
+    // The wallet will be created when the user goes through the wallet creation flow
   }
 
 /// Creates a new main wallet and a backup HushWallet
@@ -58,13 +59,13 @@ class WalletService {
   }
 
   /// Derives Ethereum (public) address from private key - this address is used perform transaction
-  String getEthereumAddress(String privateKey) {
+  String getEthereumAddress(String privateKey) { // should be displayed in the wallet page 
     final private = EthPrivateKey.fromHex(privateKey);
     return private.address.hexEip55;
   }
 
   /// Saves private key securely
-  Future<void> savePrivateKey(String privateKey) async {
+  Future<void> savePrivateKey(String privateKey) async {         
     await storage.write(key: "private_key", value: privateKey);
   }
 
