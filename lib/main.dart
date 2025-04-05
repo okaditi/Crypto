@@ -1,26 +1,43 @@
 import 'package:flutter/material.dart';
 import 'package:crypto_wallet/utils/encryption_helper.dart';
-// ignore: unused_import
 import 'package:crypto_wallet/utils/security_checker.dart';
-
-
-// ignore_for_file: unused_local_variable
+import 'package:crypto_wallet/services/threat_logger.dart';
 import 'services/wallet_services.dart';
 import 'services/hush_wallet_services.dart';
 import 'package:web3dart/web3dart.dart';
-// ignore: unused_import
 import 'package:flutter_jailbreak_detection/flutter_jailbreak_detection.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
+// Future<void> main() async {
+//   // Load environment variables before app starts
+//   await dotenv.load(fileName: ".env");
+
+//   runApp(MyApp()); // or whatever your app entry is
+// }
 
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // Load encryption key when the app starts
-  await EncryptionHelper.loadKey();
+  await dotenv.load(fileName: ".env"); 
+  //calling encryption helper
+  await EncryptionHelper.loadKey(); 
+  await checkDeviceSecurity();
+
+
+  // Check if device is jailbroken/rooted
+  bool isRooted = await FlutterJailbreakDetection.jailbroken;
+  if (isRooted) {
+    await ThreatLogger.log('⚠️ Device is jailbroken or rooted!');
+  } else {
+    await ThreatLogger.log('✅ Device integrity check passed.');
+  }
+
+  // Log that the app has started
+  await ThreatLogger.log('App started – threat logger is active ✅');
 
   runApp(CryptoWalletApp());
 }
+
 
 class CryptoWalletApp extends StatelessWidget {
   const CryptoWalletApp({super.key});

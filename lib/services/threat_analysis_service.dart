@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 // Import flutter_dotenv or your chosen config management package if used
 // import 'package:flutter_dotenv/flutter_dotenv.dart';
 
@@ -17,7 +19,7 @@ class ThreatAnalysisService {
   // Example using flutter_dotenv (ensure you have setup .env file)
   // final String _apiKey = dotenv.env['GEMINI_API_KEY']!;
   // Or load from a secure config service
-  final String _apiKey = "YOUR_GEMINI_API_KEY"; // <-- Replace with secure loading method
+  final String _apiKey = dotenv.env['GEMINI_API_KEY'] ?? ''; // <-- Replace with secure loading method
 
   late final GenerativeModel _model;
 
