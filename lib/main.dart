@@ -1,32 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:crypto_wallet/utils/encryption_helper.dart';
-<<<<<<< HEAD
 import 'package:crypto_wallet/utils/security_checker.dart';
 import 'package:crypto_wallet/services/threat_logger.dart';
 import 'services/wallet_services.dart';
 import 'services/hush_wallet_services.dart';
 import 'package:web3dart/web3dart.dart';
 import 'package:flutter_jailbreak_detection/flutter_jailbreak_detection.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-
-// Future<void> main() async {
-//   // Load environment variables before app starts
-//   await dotenv.load(fileName: ".env");
-
-//   runApp(MyApp()); // or whatever your app entry is
-// }
-=======
-
-// ignore_for_file: unused_local_variable
-import 'services/wallet_services.dart';
-import 'services/hush_wallet_services.dart';
-import 'package:web3dart/web3dart.dart';
->>>>>>> 3561be40814e51804411087dc9628529d16abaa7
-
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load(fileName: ".env"); 
+
   //calling encryption helper
   await EncryptionHelper.loadKey(); 
   await checkDeviceSecurity();
@@ -641,8 +624,6 @@ class _WalletScreenState extends State<WalletScreen> {
     );
   }
 }
-<<<<<<< HEAD
-=======
 
 // -------------------- CREATE WALLET SCREEN --------------------
 class CreateWalletScreen extends StatefulWidget {
@@ -1045,6 +1026,3 @@ class _HushWalletScreenState extends State<HushWalletScreen> {
     );
   }
 }
-=======
-}
->>>>>>> bd11ac628fd84ab6e17f184e6b512c44b7871bbe

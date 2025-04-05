@@ -7,7 +7,7 @@ import 'package:http/http.dart' as http;
 
 class HushWalletService {
   final storage = FlutterSecureStorage();
-  final String rpcUrl = "https://sepolia.infura.io/v3/YOUR_INFURA_KEY";
+  final String rpcUrl = "https://sepolia.infura.io/v3/235b57e865d249359ec1aebd2c620c39";
   late Web3Client ethClient;
 
   HushWalletService() {
