@@ -75,6 +75,30 @@ class _LoginScreenState extends State<LoginScreen> {
     return digest.toString();
   }
 
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedCredentials();
+  }
+
+  Future<void> _loadSavedCredentials() async {
+    try {
+      // Get stored credentials
+      final storedUsername = await _storage.read(key: 'wallet_username');
+      final storedPassword = await _storage.read(key: 'wallet_password');
+
+      // If credentials exist, populate the text fields
+      if (storedUsername != null) {
+        _usernameController.text = storedUsername;
+      }
+      if (storedPassword != null) {
+        _passwordController.text = storedPassword;
+      }
+    } catch (e) {
+      print('Error loading credentials: $e');
+    }
+  }
+
   Future<void> _verifyAndLogin() async {
     setState(() {
       _isLoading = true;
@@ -106,6 +130,10 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
 
+      // Save the credentials for future logins
+      await _storage.write(key: 'wallet_username', value: _usernameController.text);
+      await _storage.write(key: 'wallet_password', value: _passwordController.text);
+      
       // Credentials verified, proceed to main screen
       Navigator.pushReplacement(
         context,
