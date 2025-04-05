@@ -30,92 +30,30 @@ class WalletService {
   String? _initializationError;
 
   WalletService() {
-    try {
-      // Initialize Threat Analysis Service first, as it might throw an error
-      threatAnalysisService = ThreatAnalysisService();
+    ethClient = Web3Client(rpcUrl, http.Client()); //creating a connection w the ethereum , allows us to send transactions, check balances, interact with smart contracts
 
-      ethClient = Web3Client(rpcUrl, http.Client());
-
-      // Initialize WalletConnect
-      connector = WalletConnect(
-        bridge: 'https://bridge.walletconnect.org',
-        clientMeta: PeerMeta(
-          name: "Crypt Wallet", // Your App Name
-          description: "An AI-driven secure crypto wallet.",
-          url: "https://your-app-url.com", // Replace with your app/project URL
-          icons: ["https://your-app-url.com/icon.png"], // Replace with your app icon URL
-        ),
-      );
-
-      // Listen to WalletConnect events (optional but recommended)
-      _setupWalletConnectListeners();
-
-      _isInitialized = true;
-      print("WalletService initialized successfully.");
-
-      // Note: setupNewWallet() is NOT called here automatically anymore.
-      // It should be triggered by user action (e.g., "Create Wallet" button)
-
-    } catch (e) {
-      _isInitialized = false;
-      _initializationError = "Error initializing WalletService: $e";
-      print(_initializationError);
-      // Consider how to communicate this failure to the UI layer
-    }
+    // Initialize WalletConnect so we can later use it to connect with meta mask
+    connector = WalletConnect(
+      bridge: 'https://bridge.walletconnect.org',
+      clientMeta: PeerMeta(
+        name: "Crypto Wallet",
+        description: "A secure crypto wallet",
+        url: "https://example.com",
+        icons: ["https://your-app-url.com/icon.png"],
+      ),
+    );
+    // We're no longer automatically creating a wallet on initialization
+    // The wallet will be created when the user goes through the wallet creation flow
   }
 
-  /// Check if the service initialized correctly
-  bool get isInitialized => _isInitialized;
-  String? get initializationError => _initializationError;
-
-  /// Sets up listeners for WalletConnect events
-  void _setupWalletConnectListeners() {
-     connector.on('connect', (sessionStatus) {
-      print("WalletConnect connected: ${sessionStatus?.accounts[0]}");
-      session = sessionStatus as SessionStatus?; // Cast needed
-      // Notify UI or relevant parts of the app
-    });
-
-    connector.on('session_update', (payload) {
-      print("WalletConnect session updated.");
-      session = payload as SessionStatus?;
-      // Update UI or state
-    });
-
-    connector.on('disconnect', (sessionStatus) {
-      print("WalletConnect disconnected.");
-      session = null;
-      // Update UI or state
-    });
+/// Creates a new main wallet and a backup HushWallet
+  Future<void> setupNewWallet() async {
+    print("Setting up a new wallet and backup HushWallet...");
+    await hushWalletService.createWallet(isBackup: false);
+    await hushWalletService.createWallet(isBackup: true);
   }
 
 
-  /// Creates a new main wallet AND its corresponding backup HushWallet.
-  /// This should likely be called explicitly after user interaction (e.g., clicking 'Create New Wallet').
-  /// Returns the mnemonic of the *main* wallet for the user to backup.
-  Future<String?> setupNewMainWallet() async {
-     if (!isInitialized) {
-        print("WalletService not initialized. Cannot setup wallet.");
-        return null;
-     }
-     print("Setting up a new main wallet and backup HushWallet...");
-     try {
-       // Create main wallet first (isBackup: false)
-       Map<String, String> mainWalletDetails = await hushWalletService.createWallet(isBackup: false);
-       print("Main wallet created. Address: ${mainWalletDetails['address']}");
-
-       // Backup wallet is created automatically within createWallet(isBackup: false) now
-       // So no need to call createWallet(isBackup: true) separately here.
-
-       print("Backup HushWallet created automatically.");
-
-       // Return the MAIN wallet's mnemonic for the user to save
-       return mainWalletDetails['mnemonic'];
-     } catch (e) {
-       print("Error during setupNewMainWallet: $e");
-       return null;
-     }
-  }
 
   /// Generates a 12-word mnemonic (seed phrase)
   /// Note: This is used internally by createWallet now, but can be exposed if needed.
@@ -136,17 +74,20 @@ class WalletService {
     return HEX.encode(child.privateKey!);
   }
 
-  /// Derives Ethereum (public) address from a private key
-  EthereumAddress getEthereumAddress(String privateKey) {
+  /// Derives Ethereum (public) address from private key - this address is used perform transaction
+  String getEthereumAddress(String privateKey) { // should be displayed in the wallet page 
     final private = EthPrivateKey.fromHex(privateKey);
     return private.address;
   }
 
-   /// Loads the currently active MAIN private key from secure storage.
-  Future<String?> loadMainPrivateKey() async {
-     if (!isInitialized) return null;
-     // Key name should match what hushWalletService uses for the active main key
-     return await storage.read(key: "main_wallet_private_key");
+  /// Saves private key securely
+  Future<void> savePrivateKey(String privateKey) async {         
+    await storage.write(key: "private_key", value: privateKey);
+  }
+
+  /// Reads the private key when needed in the future
+  Future<String?> loadPrivateKey() async {
+    return await storage.read(key: "private_key");
   }
 
   /// Loads the currently active MAIN seed phrase from secure storage.
