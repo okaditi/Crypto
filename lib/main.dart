@@ -1,3 +1,6 @@
+// ignore_for_file: unused_import
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'services/threat_analysis_service.dart';
 import 'package:flutter/material.dart';
 import 'package:crypto_wallet/utils/encryption_helper.dart';
 import 'package:crypto_wallet/utils/security_checker.dart';
@@ -6,32 +9,30 @@ import 'services/wallet_services.dart';
 import 'services/hush_wallet_services.dart';
 import 'package:web3dart/web3dart.dart';
 import 'package:flutter_jailbreak_detection/flutter_jailbreak_detection.dart';
+import 'screens/personal_details_screen.dart';
+import 'screens/admin_screen.dart';
+import 'screens/registration_screen.dart';
+import 'screens/hush_wallet_creation_screen.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:crypto/crypto.dart' as crypto;
+import 'dart:convert';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Load encryption key when the app starts
+  await EncryptionHelper.loadKey();
 
-  //calling encryption helper
-  await EncryptionHelper.loadKey(); 
-  await checkDeviceSecurity();
+  //Load the dot env file when the app starts
+  
+  await dotenv.load();
 
-
-  // Check if device is jailbroken/rooted
-  bool isRooted = await FlutterJailbreakDetection.jailbroken;
-  if (isRooted) {
-    await ThreatLogger.log('⚠️ Device is jailbroken or rooted!');
-  } else {
-    await ThreatLogger.log('✅ Device integrity check passed.');
-  }
-
-  // Log that the app has started
-  await ThreatLogger.log('App started – threat logger is active ✅');
 
   runApp(CryptoWalletApp());
 }
 
-
 class CryptoWalletApp extends StatelessWidget {
-  CryptoWalletApp({super.key});
+  const CryptoWalletApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -44,9 +45,81 @@ class CryptoWalletApp extends StatelessWidget {
   }
 }
 
-// -------------------- LOGIN SCREEN --------------------
-class LoginScreen extends StatelessWidget {
+// -------------------- LOGIN SCREEN -------------------------
+class LoginScreen extends StatefulWidget {
+  LoginScreen({super.key});
+
+  @override
+  _LoginScreenState createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
   final WalletService walletService = WalletService();
+  final _storage = const FlutterSecureStorage();
+  final TextEditingController _usernameController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  bool _isLoading = false;
+  String? _errorMessage;
+
+  @override
+  void dispose() {
+    _usernameController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  // Hash password using SHA-256 for verification
+  String _hashPassword(String password) {
+    final bytes = utf8.encode(password);
+    final digest = crypto.sha256.convert(bytes);
+    return digest.toString();
+  }
+
+  Future<void> _verifyAndLogin() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      // Get stored credentials
+      final storedUsername = await _storage.read(key: 'wallet_username');
+      final storedPasswordHash = await _storage.read(key: 'password_hash');
+
+      // Check if user exists
+      if (storedUsername == null || storedPasswordHash == null) {
+        setState(() {
+          _errorMessage = 'No registered user found. Please register first.';
+          _isLoading = false;
+        });
+        return;
+      }
+
+      // Verify credentials
+      final inputPasswordHash = _hashPassword(_passwordController.text);
+      
+      if (_usernameController.text != storedUsername || inputPasswordHash != storedPasswordHash) {
+        setState(() {
+          _errorMessage = 'Invalid username or password';
+          _isLoading = false;
+        });
+        return;
+      }
+
+      // Credentials verified, proceed to main screen
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => MainScreen(walletService: walletService),
+        ),
+      );
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Authentication error: $e';
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -58,7 +131,7 @@ class LoginScreen extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
+              const Text(
                 "Crypt", 
                 style: TextStyle(
                   fontSize: 50, 
@@ -66,59 +139,73 @@ class LoginScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 40,),
-              Text(
+              const Text(
                 "Welcome back you've been missed!",
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 textAlign: TextAlign.center,
               ),
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
               TextField(
-                decoration: InputDecoration(
+                controller: _usernameController,
+                decoration: const InputDecoration(
                   labelText: 'Username',
                   border: OutlineInputBorder(),
                 ),
               ),
-              SizedBox(height: 10),
+              const SizedBox(height: 10),
               TextField(
+                controller: _passwordController,
                 obscureText: true,
-                decoration: InputDecoration(
+                decoration: const InputDecoration(
                   labelText: 'Password',
                   border: OutlineInputBorder(),
                 ),
               ),
-              SizedBox(height: 10),
-              Align(
-                alignment: Alignment.centerRight,
-                child: GestureDetector(
-                  onTap: () {},
+              if (_errorMessage != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8.0),
                   child: Text(
-                    'Forgot Password?',
-                    style: TextStyle(color: Colors.grey),
+                    _errorMessage!,
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                ),
+              const SizedBox(height: 10),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => RegistrationScreen(
+                          walletService: walletService,
+                        ),
+                      ),
+                    );
+                  }, 
+                  child: const Text(
+                    'New user?',
+                    style: TextStyle(color: Colors.blue),
                   ),
                 ),
               ),
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.deepPurple[500],
-                    padding: EdgeInsets.symmetric(vertical: 15),
+                    padding: const EdgeInsets.symmetric(vertical: 15),
                   ),
-                  onPressed: () {
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => MainScreen(walletService: walletService),
-                      ),
-                    );
-                  },
-                  child: Text(
-                    'Sign In',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold
-                    ),
-                    ),
+                  onPressed: _isLoading ? null : _verifyAndLogin,
+                  child: _isLoading
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text(
+                          'Sign In',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold
+                          ),
+                        ),
                 ),
               ),
             ],
@@ -133,7 +220,7 @@ class LoginScreen extends StatelessWidget {
 //--------------------- MainScreen to handle navigation -----------------------------
 class MainScreen extends StatefulWidget {
   final WalletService walletService;
-  MainScreen({required this.walletService});
+  const MainScreen({super.key, required this.walletService});
 
   @override
   _MainScreenState createState() => _MainScreenState();
@@ -187,41 +274,293 @@ class _MainScreenState extends State<MainScreen> {
   }
 }
 
-// --------------------- HomeContent ---------------------
-class HomeContent extends StatelessWidget {
+// --------------------- HomeContent with Threat Analysis Integration ---------------------
+class HomeContent extends StatefulWidget {
+  const HomeContent({super.key});
+
+  @override
+  _HomeContentState createState() => _HomeContentState();
+}
+
+class _HomeContentState extends State<HomeContent> {
+  bool _isLoading = false;
+  String _riskLevel = 'Unknown';
+  String _threatExplanation = '';
+  Color _riskColor = Colors.grey;
+  IconData _riskIcon = Icons.help_outline;
+
+  // Initialize the threat analysis service
+  late ThreatAnalysisService _threatAnalysisService;
+  
+  // Controller for search input
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeServices();
+  }
+
+  Future<void> _initializeServices() async {
+    try {
+      await dotenv.load(); // Load environment variables
+      _threatAnalysisService = ThreatAnalysisService();
+    } catch (e) {
+      print("Failed to initialize ThreatAnalysisService: $e");
+      // Show a message to the user that this feature is unavailable
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Threat analysis feature unavailable: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  void _updateRiskVisuals(String riskLevel) {
+    setState(() {
+      _riskLevel = riskLevel;
+      
+      // Set risk color and icon based on risk level
+      switch (riskLevel.toLowerCase()) {
+        case 'high':
+          _riskColor = Colors.red;
+          _riskIcon = Icons.warning_rounded;
+          break;
+        case 'medium':
+          _riskColor = Colors.orange;
+          _riskIcon = Icons.security_update_warning;
+          break;
+        case 'low':
+          _riskColor = Colors.yellow;
+          _riskIcon = Icons.info_outline;
+          break;
+        case 'none':
+          _riskColor = Colors.green;
+          _riskIcon = Icons.verified_user;
+          break;
+        default:
+          _riskColor = Colors.grey;
+          _riskIcon = Icons.help_outline;
+          break;
+      }
+    });
+  }
+
+  Future<void> _analyzeInput(String input) async {
+    if (input.isEmpty) return;
+    
+    // Determine input type (simplified logic - could be improved)
+    ThreatInputType inputType = ThreatInputType.generalText;
+    
+    if (input.startsWith('0x') && input.length == 42) {
+      inputType = ThreatInputType.walletAddress;
+    } else if (input.startsWith('0x') && input.length > 60) {
+      inputType = ThreatInputType.transactionHash;
+    } else if (input.contains('.') && (input.contains('http') || !input.contains(' '))) {
+      inputType = ThreatInputType.url;
+    }
+    
+    setState(() {
+      _isLoading = true;
+    });
+    
+    try {
+      final result = await _threatAnalysisService.analyzeForThreat(
+        inputData: input,
+        inputType: inputType,
+      );
+      
+      _updateRiskVisuals(result['riskLevel']);
+      setState(() {
+        _threatExplanation = result['explanation'];
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _riskLevel = 'Error';
+        _threatExplanation = 'Analysis failed: ${e.toString()}';
+        _riskColor = Colors.grey;
+        _riskIcon = Icons.error_outline;
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Home'),
+        title: const Text('Home'),
         backgroundColor: Colors.black,
         elevation: 0,
       ),
       backgroundColor: Colors.black,
-      body: Center(
-        child: Text(
-          'Crypt',
-          style: TextStyle(
-            fontSize: 40,
-            fontWeight: FontWeight.bold,
-            fontFamily: 'Roboto',
-          ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            const Text(
+              'Crypt',
+              style: TextStyle(
+                fontSize: 40,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Roboto',
+              ),
+            ),
+            const SizedBox(height: 30),
+            // Search bar for threat analysis
+            TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Enter address, URL, or text to analyze',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.clear),
+                  onPressed: () => _searchController.clear(),
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.deepPurple[500]!),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.deepPurple[500]!, width: 2),
+                ),
+              ),
+              onSubmitted: _analyzeInput,
+            ),
+            const SizedBox(height: 20),
+            // Analysis action button
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.deepPurple[500],
+                  padding: const EdgeInsets.symmetric(vertical: 15),
+                ),
+                onPressed: _isLoading 
+                  ? null 
+                  : () => _analyzeInput(_searchController.text),
+                child: _isLoading
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                    )
+                  : const Text('Analyze for Threats'),
+              ),
+            ),
+            const SizedBox(height: 40),
+            // Risk level indicator
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 500),
+              curve: Curves.easeInOut,
+              padding: const EdgeInsets.all(20),
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: _riskColor.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(color: _riskColor, width: 2),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        _riskIcon,
+                        color: _riskColor,
+                        size: 40,
+                      ),
+                      const SizedBox(width: 15),
+                      Text(
+                        'Risk Level: $_riskLevel',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: _riskColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (_threatExplanation.isNotEmpty) ...[
+                    const SizedBox(height: 15),
+                    Text(
+                      _threatExplanation,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[300],
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            // Tips based on risk level
+            if (_riskLevel != 'Unknown' && _riskLevel != 'Error') ...[
+              Container(
+                padding: const EdgeInsets.all(15),
+                decoration: BoxDecoration(
+                  color: Colors.grey[900],
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _getRiskTip(),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );
   }
+  
+  String _getRiskTip() {
+    switch (_riskLevel.toLowerCase()) {
+      case 'high':
+        return '🚨 Whoa there! This looks dangerous. Avoid any interaction with this address or URL!';
+      case 'medium':
+        return '⚠️ Proceed with extreme caution. Double-check all details before proceeding.';
+      case 'low':
+        return '🔍 Minor concerns detected. Review carefully before proceeding.';
+      case 'none':
+        return '✅ Looks good! No threats detected in our analysis.';
+      default:
+        return '🤔 Something went wrong with the analysis. Try again later.';
+    }
+  }
 }
-
 // ---------------------------- SettingsScreen ----------------------------
 class SettingsScreen extends StatelessWidget {
   final HushWalletService hushWalletService = HushWalletService();
   final WalletService walletService = WalletService();
 
+  SettingsScreen({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Settings'),
+        title: const Text('Settings'),
         backgroundColor: Colors.black,
         elevation: 0,
       ),
@@ -231,60 +570,60 @@ class SettingsScreen extends StatelessWidget {
         child: Column(
           children: [
             ListTile(
-              leading: Icon(Icons.person_outline),
-              title: Text('Profile'),
-              trailing: Icon(Icons.arrow_forward_ios, size: 16),
+              leading: const Icon(Icons.person_outline),
+              title: const Text('Profile'),
+              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
               onTap: () {
                 // Handle profile tap
               },
             ),
             ListTile(
-              leading: Icon(Icons.security),
-              title: Text('Security'),
-              trailing: Icon(Icons.arrow_forward_ios, size: 16),
+              leading: const Icon(Icons.security),
+              title: const Text('Security'),
+              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
               onTap: () {
                 // Handle security tap
               },
             ),
             ListTile(
-              leading: Icon(Icons.notifications_outlined),
-              title: Text('Notifications'),
-              trailing: Icon(Icons.arrow_forward_ios, size: 16),
+              leading: const Icon(Icons.notifications_outlined),
+              title: const Text('Notifications'),
+              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
               onTap: () {
                 // Handle notifications tap
               },
             ),
             ListTile(
-              leading: Icon(Icons.backup_outlined),
-              title: Text('HushWallet'),
-              trailing: Icon(Icons.arrow_forward_ios, size: 16),
+              leading: const Icon(Icons.backup_outlined),
+              title: const Text('HushWallet'),
+              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
               onTap: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => HushWalletScreen(hushWalletService: hushWalletService),
+                    builder: (context) => HushWalletScreen(hushWalletService: hushWalletService, walletService: walletService),
                   ),
                 );
               },
             ),
             Divider(color: Colors.grey[800]),
             ListTile(
-              leading: Icon(Icons.logout, color: Colors.red),
-              title: Text('Sign Out', style: TextStyle(color: Colors.red)),
+              leading: const Icon(Icons.logout, color: Colors.red),
+              title: const Text('Sign Out', style: TextStyle(color: Colors.red)),
               onTap: () {
                 showDialog(
                   context: context,
                   builder: (BuildContext context) {
                     return AlertDialog(
-                      title: Text('Sign Out'),
-                      content: Text('Are you sure you want to sign out? This will delete your wallet data for the demo.'),
+                      title: const Text('Sign Out'),
+                      content: const Text('Are you sure you want to sign out? This will delete your wallet data for the demo.'),
                       actions: [
                         TextButton(
-                          child: Text('Cancel'),
+                          child: const Text('Cancel'),
                           onPressed: () => Navigator.pop(context),
                         ),
                         TextButton(
-                          child: Text('Sign Out', style: TextStyle(color: Colors.red)),
+                          child: const Text('Sign Out', style: TextStyle(color: Colors.red)),
                           onPressed: () async {
                             await walletService.storage.delete(key: "private_key");
                             Navigator.pushAndRemoveUntil(
@@ -300,6 +639,19 @@ class SettingsScreen extends StatelessWidget {
                 );
               },
             ),
+            ListTile(
+              leading: const Icon(Icons.admin_panel_settings),
+              title: const Text('Admin Panel'),
+              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const AdminScreen(),
+                  ),
+                );
+              },
+            ),
           ],
         ),
       ),
@@ -310,7 +662,7 @@ class SettingsScreen extends StatelessWidget {
 // -------------------- WALLET SCREEN --------------------
 class WalletScreen extends StatefulWidget {
   final WalletService walletService;
-  WalletScreen({required this.walletService});
+  const WalletScreen({super.key, required this.walletService});
 
   @override
   _WalletScreenState createState() => _WalletScreenState();
@@ -351,9 +703,7 @@ class _WalletScreenState extends State<WalletScreen> {
 
         EtherAmount ethBalance = await widget.walletService.getBalance(address);
         double ethValue = ethBalance.getValueInUnit(EtherUnit.ether);
-        double ethToUsd = await widget.walletService.getEthToUsdRate();
-        // ignore: unused_local_variable
-        double ethUsdValue = ethValue * ethToUsd;
+        // double ethUsdValue = ethValue * 2000; // Using approximate ETH price for Sepolia testnet
 
         List<Map<String, String>> fetchedAssets = await widget.walletService.getAllAssets(address);
 
@@ -362,10 +712,11 @@ class _WalletScreenState extends State<WalletScreen> {
           assets = fetchedAssets;
         });
       } else {
-        setState(() => balance = 'No wallet found');
+        setState(() => balance = '0.0000');
       }
     } catch (e) {
-      setState(() => balance = 'Error fetching balance');
+      print("Error in _loadWalletData: $e");
+      setState(() => balance = '0.0000');
     }
   }
 
@@ -379,8 +730,8 @@ class _WalletScreenState extends State<WalletScreen> {
             backgroundColor: Colors.blue,
             child: Icon(icon, color: Colors.white, size: 30),
           ),
-          SizedBox(height: 8),
-          Text(label, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
         ],
       ),
     );
@@ -394,29 +745,29 @@ class _WalletScreenState extends State<WalletScreen> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('Send ETH'),
+          title: const Text('Send ETH'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               TextField(
                 controller: recipientController,
-                decoration: InputDecoration(labelText: 'Recipient Address'),
+                decoration: const InputDecoration(labelText: 'Recipient Address'),
               ),
-              SizedBox(height: 10),
+              const SizedBox(height: 10),
               TextField(
                 controller: amountController,
-                decoration: InputDecoration(labelText: 'Amount (ETH)'),
-                keyboardType: TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(labelText: 'Amount (ETH)'),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
               ),
             ],
           ),
           actions: [
             TextButton(
-              child: Text('Cancel'),
+              child: const Text('Cancel'),
               onPressed: () => Navigator.of(context).pop(),
             ),
             TextButton(
-              child: Text('Send'),
+              child: const Text('Send'),
               onPressed: () async {
                 final recipient = recipientController.text;
                 final amount = double.tryParse(amountController.text);
@@ -427,12 +778,12 @@ class _WalletScreenState extends State<WalletScreen> {
                     if (privateKey != null) {
                       await widget.walletService.sendTransaction(privateKey, recipient, amount);
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Transaction sent successfully!')),
+                        const SnackBar(content: Text('Transaction sent successfully!')),
                       );
                       _loadWalletData(); // Refresh the balance after sending
                     } else {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('No private key found.')),
+                        const SnackBar(content: Text('No private key found.')),
                       );
                     }
                   } catch (e) {
@@ -442,7 +793,7 @@ class _WalletScreenState extends State<WalletScreen> {
                   }
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Please enter valid details.')),
+                    const SnackBar(content: Text('Please enter valid details.')),
                   );
                 }
                 Navigator.of(context).pop();
@@ -459,30 +810,30 @@ class _WalletScreenState extends State<WalletScreen> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('Receive ETH'),
+          title: const Text('Receive ETH'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Your wallet address:'),
-              SizedBox(height: 10),
+              const Text('Your wallet address:'),
+              const SizedBox(height: 10),
               Container(
-                padding: EdgeInsets.all(10),
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   color: Colors.grey[200],
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: SelectableText(
                   walletAddress ?? 'No address available',
-                  style: TextStyle(fontSize: 12),
+                  style: const TextStyle(fontSize: 12),
                 ),
               ),
-              SizedBox(height: 20),
-              Text('Share this address to receive ETH'),
+              const SizedBox(height: 20),
+              const Text('Share this address to receive ETH'),
             ],
           ),
           actions: [
             TextButton(
-              child: Text('Close'),
+              child: const Text('Close'),
               onPressed: () => Navigator.of(context).pop(),
             ),
           ],
@@ -496,11 +847,11 @@ class _WalletScreenState extends State<WalletScreen> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('Swap Tokens'),
-          content: Text('Token swap functionality coming soon!'),
+          title: const Text('Swap Tokens'),
+          content: const Text('Token swap functionality coming soon!'),
           actions: [
             TextButton(
-              child: Text('Close'),
+              child: const Text('Close'),
               onPressed: () => Navigator.of(context).pop(),
             ),
           ],
@@ -515,11 +866,11 @@ class _WalletScreenState extends State<WalletScreen> {
       return Scaffold(
         backgroundColor: Colors.black,
         appBar: AppBar(
-          title: Text('Wallet', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+          title: const Text('Wallet', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
           backgroundColor: Colors.black,
           elevation: 0,
         ),
-        body: Center(child: CircularProgressIndicator()),
+        body: const Center(child: CircularProgressIndicator()),
       );
     }
     
@@ -538,7 +889,7 @@ class _WalletScreenState extends State<WalletScreen> {
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        title: Text('Wallet', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+        title: const Text('Wallet', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
         backgroundColor: Colors.black,
         elevation: 0,
       ),
@@ -548,23 +899,23 @@ class _WalletScreenState extends State<WalletScreen> {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Container(
-              padding: EdgeInsets.all(20),
+              padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 color: Colors.grey[900],
                 borderRadius: BorderRadius.circular(15),
               ),
               child: Column(
                 children: [
-                  Text('Total Balance', style: TextStyle(color: Colors.grey, fontSize: 16)),
-                  SizedBox(height: 5),
-                  Text('$balance ETH', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
-                  Text('\$${assets.isNotEmpty ? assets[0]['usd'] : '0.00'} USD', style: TextStyle(fontSize: 18, color: Colors.greenAccent)),
+                  const Text('Total Balance', style: TextStyle(color: Colors.grey, fontSize: 16)),
+                  const SizedBox(height: 5),
+                  Text('$balance ETH', style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
+                  Text('\$${assets.isNotEmpty ? assets[0]['usd'] : '0.00'} USD', style: const TextStyle(fontSize: 18, color: Colors.greenAccent)),
                 ],
               ),
             ),
-            SizedBox(height: 10),
+            const SizedBox(height: 10),
             Container(
-              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               decoration: BoxDecoration(
                 color: Colors.grey[900],
                 borderRadius: BorderRadius.circular(15),
@@ -572,19 +923,19 @@ class _WalletScreenState extends State<WalletScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.account_balance_wallet, color: Colors.grey),
-                  SizedBox(width: 10),
+                  const Icon(Icons.account_balance_wallet, color: Colors.grey),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      '${walletAddress ?? "No wallet address"}',
-                      style: TextStyle(fontSize: 12),
+                      walletAddress ?? "No wallet address",
+                      style: const TextStyle(fontSize: 12),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
               ),
             ),
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
@@ -593,32 +944,32 @@ class _WalletScreenState extends State<WalletScreen> {
                 _walletActionButton(Icons.swap_horiz, 'Swap', onPressed: _showSwapDialog),
               ],
             ),
-            SizedBox(height: 20),
-            Row(
+            const SizedBox(height: 20),
+            const Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text('Assets', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                 Text('Activity', style: TextStyle(color: Colors.grey, fontSize: 16)),
               ],
             ),
-            Divider(color: Colors.grey),
-            Expanded(
-              child: ListView.builder(
-                itemCount: assets.length,
-                itemBuilder: (context, index) {
-                  final asset = assets[index];
-                  return ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: Colors.grey[800],
-                      child: Text(asset['symbol'] ?? '?', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    ),
-                    title: Text('${asset['amount']} ${asset['symbol']}', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                    subtitle: Text('\$${asset['usd']} USD', style: TextStyle(color: Colors.grey)),
-                    trailing: Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
-                  );
-                },
-              ),
-            ),
+            const Divider(color: Colors.grey),
+            // Expanded(
+            //   child: ListView.builder(
+            //     itemCount: assets.length,
+            //     itemBuilder: (context, index) {
+            //       final asset = assets[index];
+            //       return ListTile(
+            //         leading: CircleAvatar(
+            //           backgroundColor: Colors.grey[800],
+            //           child: Text(asset['symbol'] ?? '?', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            //         ),
+            //         title: Text('${asset['amount']} ${asset['symbol']}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            //         subtitle: Text('\$${asset['usd']} USD', style: const TextStyle(color: Colors.grey)),
+            //         trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+            //       );
+            //     },
+            //   ),
+            // ),
           ],
         ),
       ),
@@ -630,8 +981,13 @@ class _WalletScreenState extends State<WalletScreen> {
 class CreateWalletScreen extends StatefulWidget {
   final WalletService walletService;
   final VoidCallback onWalletCreated;
+  final Map<String, String>? promotedWalletDetails;
   
-  CreateWalletScreen({required this.walletService, required this.onWalletCreated});
+  const CreateWalletScreen({super.key, 
+    required this.walletService, 
+    required this.onWalletCreated,
+    this.promotedWalletDetails,
+  });
   
   @override
   _CreateWalletScreenState createState() => _CreateWalletScreenState();
@@ -644,6 +1000,41 @@ class _CreateWalletScreenState extends State<CreateWalletScreen> {
   String? privateKey;
   String? walletAddress;
   List<String> mnemonicWords = [];
+  
+  @override
+  void initState() {
+    super.initState();
+    if (widget.promotedWalletDetails != null) {
+      // If we have promoted wallet details, use them
+      _usePromotedWallet();
+    }
+  }
+
+  void _usePromotedWallet() async {
+    setState(() {
+      isCreating = true;
+    });
+
+    try {
+      // Save the promoted wallet details
+      await widget.walletService.savePrivateKey(
+        widget.promotedWalletDetails!["mainWalletPrivateKey"]!
+      );
+      
+      // Create new backup wallet
+      await widget.walletService.hushWalletService.createWallet(isBackup: true);
+      
+      widget.onWalletCreated();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error setting up promoted wallet: $e'))
+      );
+    }
+    
+    setState(() {
+      isCreating = false;
+    });
+  }
   
   void _startWalletCreation() async {
     setState(() {
@@ -675,36 +1066,63 @@ class _CreateWalletScreenState extends State<CreateWalletScreen> {
       await widget.walletService.saveSeedPhrase(mnemonic!);
       await widget.walletService.savePrivateKey(privateKey!);
       
-      // Now creating the backup HushWallet
-      await widget.walletService.hushWalletService.createWallet(isBackup: true);
-      
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Wallet created successfully!'))
+        const SnackBar(content: Text('Wallet created successfully!'))
       );
       
-      widget.onWalletCreated();
+      // Navigate to HushWallet creation screen
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => HushWalletCreationScreen(
+            hushWalletService: widget.walletService.hushWalletService,
+            walletService: widget.walletService,
+            onHushWalletCreated: widget.onWalletCreated,
+          ),
+        ),
+      );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error creating wallet: $e'))
       );
+      setState(() {
+        isCreating = false;
+      });
     }
-    
-    setState(() {
-      isCreating = false;
-    });
   }
   
   @override
   Widget build(BuildContext context) {
+    // If we have promoted wallet details, skip the UI and process directly
+    if (widget.promotedWalletDetails != null && !isCreating) {
+      _usePromotedWallet();
+      return const Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 20),
+              Text(
+                'Setting up promoted wallet...',
+                style: TextStyle(fontSize: 16),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        title: Text('Create Wallet', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+        title: const Text('Main Wallet', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
         backgroundColor: Colors.black,
         elevation: 0,
       ),
       body: isCreating 
-        ? Center(child: CircularProgressIndicator())
+        ? const Center(child: CircularProgressIndicator())
         : showingSeedPhrase
           ? _buildSeedPhraseScreen()
           : _buildWelcomeScreen(),
@@ -723,8 +1141,8 @@ class _CreateWalletScreenState extends State<CreateWalletScreen> {
             size: 100,
             color: Colors.deepPurple[400],
           ),
-          SizedBox(height: 30),
-          Text(
+          const SizedBox(height: 30),
+          const Text(
             'Welcome to Crypt',
             style: TextStyle(
               fontSize: 28,
@@ -732,7 +1150,7 @@ class _CreateWalletScreenState extends State<CreateWalletScreen> {
             ),
             textAlign: TextAlign.center,
           ),
-          SizedBox(height: 20),
+          const SizedBox(height: 20),
           Text(
             'It looks like you don\'t have a wallet yet. Create one to get started with cryptocurrencies!',
             style: TextStyle(
@@ -741,16 +1159,16 @@ class _CreateWalletScreenState extends State<CreateWalletScreen> {
             ),
             textAlign: TextAlign.center,
           ),
-          SizedBox(height: 40),
+          const SizedBox(height: 40),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.deepPurple[500],
-                padding: EdgeInsets.symmetric(vertical: 15),
+                padding: const EdgeInsets.symmetric(vertical: 15),
               ),
               onPressed: _startWalletCreation,
-              child: Text(
+              child: const Text(
                 'Create Wallet',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
@@ -770,16 +1188,16 @@ class _CreateWalletScreenState extends State<CreateWalletScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
+          const Text(
             'Your Recovery Phrase',
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
             ),
           ),
-          SizedBox(height: 10),
+          const SizedBox(height: 10),
           Container(
-            padding: EdgeInsets.all(16),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: Colors.red[900]?.withOpacity(0.3),
               borderRadius: BorderRadius.circular(12),
@@ -788,7 +1206,7 @@ class _CreateWalletScreenState extends State<CreateWalletScreen> {
             child: Row(
               children: [
                 Icon(Icons.warning_amber_rounded, color: Colors.red[300]),
-                SizedBox(width: 12),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     'Write these words down in the correct order and keep them safe. You will NEVER see them again. Anyone with these words can access your wallet.',
@@ -798,16 +1216,16 @@ class _CreateWalletScreenState extends State<CreateWalletScreen> {
               ],
             ),
           ),
-          SizedBox(height: 24),
+          const SizedBox(height: 24),
           Expanded(
             child: Container(
-              padding: EdgeInsets.all(16),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Colors.grey[900],
                 borderRadius: BorderRadius.circular(12),
               ),
               child: GridView.builder(
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 3,
                   childAspectRatio: 2.5,
                   crossAxisSpacing: 10,
@@ -816,7 +1234,7 @@ class _CreateWalletScreenState extends State<CreateWalletScreen> {
                 itemCount: mnemonicWords.length,
                 itemBuilder: (context, index) {
                   return Container(
-                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
                       color: Colors.grey[800],
                       borderRadius: BorderRadius.circular(8),
@@ -830,11 +1248,11 @@ class _CreateWalletScreenState extends State<CreateWalletScreen> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        SizedBox(width: 8),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             mnemonicWords[index],
-                            style: TextStyle(fontWeight: FontWeight.bold),
+                            style: const TextStyle(fontWeight: FontWeight.bold),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -845,17 +1263,78 @@ class _CreateWalletScreenState extends State<CreateWalletScreen> {
               ),
             ),
           ),
-          SizedBox(height: 24),
+          const SizedBox(height: 16),
+          // Display public and private keys
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.red[900]?.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.red[900]!, width: 1),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.warning_amber_rounded, color: Colors.red[300]),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'IMPORTANT: Your public and private keys are shown below. This is the ONLY time you will see them. Save them securely.',
+                        style: TextStyle(fontSize: 12, color: Colors.red[100], fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Public Address:',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[800],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: SelectableText(
+                    walletAddress ?? 'Error generating address',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Private Key:',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[800],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: SelectableText(
+                    privateKey ?? 'Error generating private key',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.deepPurple[500],
-                padding: EdgeInsets.symmetric(vertical: 15),
+                padding: const EdgeInsets.symmetric(vertical: 15),
               ),
               onPressed: _finishWalletCreation,
-              child: Text(
-                'I\'ve Saved My Recovery Phrase',
+              child: const Text(
+                'I\'ve Saved My Recovery Phrase and Keys',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
@@ -871,149 +1350,180 @@ class _CreateWalletScreenState extends State<CreateWalletScreen> {
 //------------------------ HushWallet Screen ------------------------
 class HushWalletScreen extends StatefulWidget {
   final HushWalletService hushWalletService;
-  HushWalletScreen({required this.hushWalletService});
+  final WalletService walletService;
+  const HushWalletScreen({super.key, 
+    required this.hushWalletService,
+    required this.walletService,
+  });
   
   @override
   _HushWalletScreenState createState() => _HushWalletScreenState();
 }
 
 class _HushWalletScreenState extends State<HushWalletScreen> {
-  String? currentWalletAddress;
-  String? backupWalletAddress;
+  Map<String, String?> walletDetails = {
+    "mainWalletAddress": null,
+    "mainWalletPrivateKey": null,
+    "backupWalletAddress": null,
+    "backupWalletPrivateKey": null,
+  };
   bool isLoading = true;
-  
+
   @override
   void initState() {
     super.initState();
-    _loadWalletAddresses();
+    _loadWalletDetails();
   }
-  
-  Future<void> _loadWalletAddresses() async {
-    setState(() {
-      isLoading = true;
-    });
-    
-    currentWalletAddress = await widget.hushWalletService.getCurrentWalletAddress();
-    backupWalletAddress = await widget.hushWalletService.getBackupWalletAddress();
-    
-    setState(() {
-      isLoading = false;
-    });
-  }
-  
-  Future<void> _triggerSelfDestruct() async {
-    final bool? confirmed = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('Self-Destruct Wallet'),
-          content: Text(
-            'This will destroy your main wallet and activate your HushWallet. '
-            'All funds will be transferred to your HushWallet before destruction. '
-            'This action cannot be undone. Are you sure you want to proceed?'
-          ),
-          actions: [
-            TextButton(
-              child: Text('Cancel'),
-              onPressed: () => Navigator.of(context).pop(false),
-            ),
-            TextButton(
-              child: Text('Proceed', style: TextStyle(color: Colors.red)),
-              onPressed: (){
-                Navigator.of(context).pop(true);
-                widget.hushWalletService.triggerSelfDestruct();
-                _loadWalletAddresses();
-              } 
-            ),
-          ],
-        );
-      },
-    );
-    
-    if (confirmed == true) {
-      await widget.hushWalletService.triggerSelfDestruct();
-      await _loadWalletAddresses();
+
+  Future<void> _loadWalletDetails() async {
+    setState(() => isLoading = true);
+    try {
+      Map<String, String?> details = await widget.hushWalletService.getAllWalletDetails();
+      setState(() {
+        walletDetails = details;
+        isLoading = false;
+      });
+    } catch (e) {
+      print("Error loading wallet details: $e");
+      setState(() => isLoading = false);
     }
   }
-  
+
+  Future<void> _triggerSelfDestruct() async {
+    try {
+      // Show confirmation dialog
+      bool? confirm = await showDialog<bool>(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: const Text('Confirm Self-Destruct'),
+            content: const Text(
+              'This will permanently delete your current wallet and activate your HushWallet. '
+              'Make sure you have backed up your HushWallet details. '
+              'This action cannot be undone.'
+            ),
+            actions: <Widget>[
+              TextButton(
+                child: const Text('Cancel'),
+                onPressed: () => Navigator.of(context).pop(false),
+              ),
+              TextButton(
+                child: const Text('Confirm'),
+                onPressed: () => Navigator.of(context).pop(true),
+              ),
+            ],
+          );
+        },
+      );
+
+      if (confirm != true) {
+        return;
+      }
+
+      // Show progress dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return const Dialog(
+            child: Padding(
+              padding: EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('Activating Hushwallet...'),
+                  SizedBox(height: 8),
+                  Text('This may take a few moments', style: TextStyle(fontSize: 12)),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+
+      // Trigger self-destruct and get updated wallet info
+      Map<String, String> updatedWallets = await widget.hushWalletService.triggerSelfDestruct();
+
+      // Close progress dialog
+      Navigator.of(context).pop();
+
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'HushWallet activated successfully!',
+            style: TextStyle(color: Colors.white),
+          ),
+          backgroundColor: Colors.green[600],
+        ),
+      );
+
+      // Navigate to MainScreen directly with updated wallet
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(
+          builder: (context) => MainScreen(walletService: widget.walletService),
+        ),
+        (Route<dynamic> route) => false,
+      );
+    } catch (e) {
+      // Close progress dialog if it's open
+      if (Navigator.canPop(context)) {
+        Navigator.of(context).pop();
+      }
+
+      // Show error message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to activate HushWallet: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('HushWallet'),
+        title: const Text('HushWallet'),
         backgroundColor: Colors.black,
         elevation: 0,
       ),
       backgroundColor: Colors.black,
-      body: isLoading ?
-          Center(child: CircularProgressIndicator())
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
           : Padding(
               padding: const EdgeInsets.all(16.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  const Text(
                     'HushWallet is a backup wallet that can be activated if your main wallet is compromised.',
                     style: TextStyle(fontSize: 16),
                   ),
-                  SizedBox(height: 20),
-                  Card(
-                    color: Colors.grey[900],
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Current Wallet',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          SizedBox(height: 8),
-                          Text(
-                            currentWalletAddress ?? 'Not available',
-                            style: TextStyle(fontSize: 14),
-                          ),
-                        ],
-                      ),
-                    ),
+                  const SizedBox(height: 20),
+                  _buildWalletCard(
+                    'Current Wallet',
+                    walletDetails["mainWalletAddress"] ?? 'Not available',
                   ),
-                  SizedBox(height: 16),
-                  Card(
-                    color: Colors.grey[900],
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Backup HushWallet',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          SizedBox(height: 8),
-                          Text(
-                            backupWalletAddress ?? 'Not available',
-                            style: TextStyle(fontSize: 14),
-                          ),
-                        ],
-                      ),
-                    ),
+                  const SizedBox(height: 16),
+                  _buildWalletCard(
+                    'Backup HushWallet',
+                    walletDetails["backupWalletAddress"] ?? 'Not available',
                   ),
-                  SizedBox(height: 30),
+                  const SizedBox(height: 30),
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.red,
-                        padding: EdgeInsets.symmetric(vertical: 15),
+                        padding: const EdgeInsets.symmetric(vertical: 15),
                       ),
                       onPressed: _triggerSelfDestruct,
-                      child: Text(
+                      child: const Text(
                         'Activate HushWallet (Self-Destruct)',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
@@ -1026,4 +1536,31 @@ class _HushWalletScreenState extends State<HushWalletScreen> {
             ),
     );
   }
+
+  Widget _buildWalletCard(String title, String address) {
+    return Card(
+      color: Colors.grey[900],
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              address,
+              style: const TextStyle(fontSize: 14),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
+

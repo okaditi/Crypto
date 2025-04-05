@@ -3,7 +3,7 @@ import 'dart:math';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class EncryptionHelper {
-  static final FlutterSecureStorage _secureStorage = FlutterSecureStorage();
+  static const FlutterSecureStorage _secureStorage = FlutterSecureStorage();
   static const String _keyStorageKey = 'encryption_key';
 
   /// Loads the encryption key if available, or generates and stores a new one

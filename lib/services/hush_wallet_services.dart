@@ -91,20 +91,21 @@ class HushWalletService {
   }
 
   /// Triggers self-destruction and activates HushWallet
-  Future<void> triggerSelfDestruct() async {
+  /// Returns a Map with the new wallet details
+  Future<Map<String, String>> triggerSelfDestruct() async {
     print("Self-destruction initiated");
 
     bool confirmDestruction = await getUserConfirmation();
     if (!confirmDestruction) {
       print("Self destruction canceled");
-      return;
+      return {}; // Return empty map if canceled
     }
 
     // Fetch the backup wallet address
     String? hushAddress = await getBackupWalletAddress();
     if (hushAddress == null) {
       print("No backup wallet found. Cannot proceed.");
-      return;
+      return {}; // Return empty map if no backup wallet
     }
 
     print("Transferring funds before destruction");
@@ -114,6 +115,13 @@ class HushWalletService {
     await activateHushWallet();
 
     print("Self-destruction complete. HushWallet is now the main wallet.");
+    
+    // Return the new wallet details
+    String? address = await getCurrentWalletAddress();
+    return {
+      "address": address ?? "",
+      "status": "activated"
+    };
   }
 
 
@@ -163,5 +171,24 @@ class HushWalletService {
   /// Fetches the current active wallet address
   Future<String?> getCurrentWalletAddress() async {
     return await storage.read(key: "main_wallet_address");
+  }
+  
+  /// Gets all wallet details including addresses and status
+  Future<Map<String, String?>> getAllWalletDetails() async {
+    String? mainAddress = await storage.read(key: "main_wallet_address");
+    String? hushAddress = await storage.read(key: "hush_wallet_address");
+    String? hushPrivateKey = await storage.read(key: "hush_wallet_private_key");
+    
+    return {
+      "mainWalletAddress": mainAddress,
+      "hushWalletAddress": hushAddress,
+      "hushWalletPrivateKey": hushPrivateKey,
+      "walletStatus": mainAddress != null ? "active" : "inactive"
+    };
+  }
+  
+  /// Gets the HushWallet private key
+  Future<String?> getHushWalletPrivateKey() async {
+    return await storage.read(key: "hush_wallet_private_key");
   }
 }
