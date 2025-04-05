@@ -1,16 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:crypto_wallet/utils/encryption_helper.dart';
-// ignore: unused_import
-import 'package:crypto_wallet/utils/security_checker.dart';
-
 
 // ignore_for_file: unused_local_variable
 import 'services/wallet_services.dart';
 import 'services/hush_wallet_services.dart';
 import 'package:web3dart/web3dart.dart';
-// ignore: unused_import
-import 'package:flutter_jailbreak_detection/flutter_jailbreak_detection.dart';
-
 
 
 void main() async {
@@ -207,6 +201,7 @@ class HomeContent extends StatelessWidget {
 // ---------------------------- SettingsScreen ----------------------------
 class SettingsScreen extends StatelessWidget {
   final HushWalletService hushWalletService = HushWalletService();
+  final WalletService walletService = WalletService();
 
   @override
   Widget build(BuildContext context) {
@@ -268,7 +263,7 @@ class SettingsScreen extends StatelessWidget {
                   builder: (BuildContext context) {
                     return AlertDialog(
                       title: Text('Sign Out'),
-                      content: Text('Are you sure you want to sign out?'),
+                      content: Text('Are you sure you want to sign out? This will delete your wallet data for the demo.'),
                       actions: [
                         TextButton(
                           child: Text('Cancel'),
@@ -276,7 +271,8 @@ class SettingsScreen extends StatelessWidget {
                         ),
                         TextButton(
                           child: Text('Sign Out', style: TextStyle(color: Colors.red)),
-                          onPressed: () {
+                          onPressed: () async {
+                            await walletService.storage.delete(key: "private_key");
                             Navigator.pushAndRemoveUntil(
                               context,
                               MaterialPageRoute(builder: (context) => LoginScreen()),
@@ -358,6 +354,146 @@ class _WalletScreenState extends State<WalletScreen> {
     }
   }
 
+  Widget _walletActionButton(IconData icon, String label, {VoidCallback? onPressed}) {
+    return GestureDetector(
+      onTap: onPressed,
+      child: Column(
+        children: [
+          CircleAvatar(
+            radius: 30,
+            backgroundColor: Colors.blue,
+            child: Icon(icon, color: Colors.white, size: 30),
+          ),
+          SizedBox(height: 8),
+          Text(label, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+
+  void _showSendDialog() {
+    final TextEditingController recipientController = TextEditingController();
+    final TextEditingController amountController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Send ETH'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: recipientController,
+                decoration: InputDecoration(labelText: 'Recipient Address'),
+              ),
+              SizedBox(height: 10),
+              TextField(
+                controller: amountController,
+                decoration: InputDecoration(labelText: 'Amount (ETH)'),
+                keyboardType: TextInputType.numberWithOptions(decimal: true),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              child: Text('Cancel'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            TextButton(
+              child: Text('Send'),
+              onPressed: () async {
+                final recipient = recipientController.text;
+                final amount = double.tryParse(amountController.text);
+
+                if (recipient.isNotEmpty && amount != null) {
+                  try {
+                    String? privateKey = await widget.walletService.loadPrivateKey();
+                    if (privateKey != null) {
+                      await widget.walletService.sendTransaction(privateKey, recipient, amount);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Transaction sent successfully!')),
+                      );
+                      _loadWalletData(); // Refresh the balance after sending
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('No private key found.')),
+                      );
+                    }
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Error sending transaction: $e')),
+                    );
+                  }
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Please enter valid details.')),
+                  );
+                }
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showReceiveDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Receive ETH'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Your wallet address:'),
+              SizedBox(height: 10),
+              Container(
+                padding: EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.grey[200],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: SelectableText(
+                  walletAddress ?? 'No address available',
+                  style: TextStyle(fontSize: 12),
+                ),
+              ),
+              SizedBox(height: 20),
+              Text('Share this address to receive ETH'),
+            ],
+          ),
+          actions: [
+            TextButton(
+              child: Text('Close'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showSwapDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Swap Tokens'),
+          content: Text('Token swap functionality coming soon!'),
+          actions: [
+            TextButton(
+              child: Text('Close'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
@@ -437,9 +573,9 @@ class _WalletScreenState extends State<WalletScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _walletActionButton(Icons.download, 'Receive'),
-                _walletActionButton(Icons.arrow_upward, 'Send'),
-                _walletActionButton(Icons.swap_horiz, 'Swap'),
+                _walletActionButton(Icons.download, 'Receive', onPressed: _showReceiveDialog),
+                _walletActionButton(Icons.arrow_upward, 'Send', onPressed: _showSendDialog),
+                _walletActionButton(Icons.swap_horiz, 'Swap', onPressed: _showSwapDialog),
               ],
             ),
             SizedBox(height: 20),
@@ -471,20 +607,6 @@ class _WalletScreenState extends State<WalletScreen> {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _walletActionButton(IconData icon, String label) {
-    return Column(
-      children: [
-        CircleAvatar(
-          radius: 30,
-          backgroundColor: Colors.blue,
-          child: Icon(icon, color: Colors.white, size: 30),
-        ),
-        SizedBox(height: 8),
-        Text(label, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-      ],
     );
   }
 }
