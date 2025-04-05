@@ -486,9 +486,6 @@ class _WalletScreenState extends State<WalletScreen> {
     );
   }
 }
-<<<<<<< HEAD
-=======
-
 // -------------------- CREATE WALLET SCREEN --------------------
 class CreateWalletScreen extends StatefulWidget {
   final WalletService walletService;
@@ -731,7 +728,6 @@ class _CreateWalletScreenState extends State<CreateWalletScreen> {
     );
   }
 }
->>>>>>> bd11ac628fd84ab6e17f184e6b512c44b7871bbe
 //------------------------ HushWallet Screen ------------------------
 class HushWalletScreen extends StatefulWidget {
   final HushWalletService hushWalletService;
@@ -890,8 +886,8 @@ class _HushWalletScreenState extends State<HushWalletScreen> {
             ),
     );
   }
-<<<<<<< HEAD
 }
-=======
+
 }
->>>>>>> bd11ac628fd84ab6e17f184e6b512c44b7871bbe
+
+
