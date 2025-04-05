@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:crypto_wallet/utils/encryption_helper.dart';
+// ignore: unused_import
 import 'package:crypto_wallet/utils/security_checker.dart';
 
 
@@ -7,6 +8,7 @@ import 'package:crypto_wallet/utils/security_checker.dart';
 import 'services/wallet_services.dart';
 import 'services/hush_wallet_services.dart';
 import 'package:web3dart/web3dart.dart';
+// ignore: unused_import
 import 'package:flutter_jailbreak_detection/flutter_jailbreak_detection.dart';
 
 
@@ -486,8 +488,6 @@ class _WalletScreenState extends State<WalletScreen> {
     );
   }
 }
-<<<<<<< HEAD
-=======
 
 // -------------------- CREATE WALLET SCREEN --------------------
 class CreateWalletScreen extends StatefulWidget {
@@ -731,7 +731,6 @@ class _CreateWalletScreenState extends State<CreateWalletScreen> {
     );
   }
 }
->>>>>>> bd11ac628fd84ab6e17f184e6b512c44b7871bbe
 //------------------------ HushWallet Screen ------------------------
 class HushWalletScreen extends StatefulWidget {
   final HushWalletService hushWalletService;
@@ -890,8 +889,4 @@ class _HushWalletScreenState extends State<HushWalletScreen> {
             ),
     );
   }
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> bd11ac628fd84ab6e17f184e6b512c44b7871bbe
